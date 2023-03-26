@@ -3,6 +3,9 @@ from disnake.ext import commands
 import psycopg2
 import asyncio
 import pytz
+from PIL import Image
+import sqlite3
+import scipy.stats as sps
 
 bot = commands.Bot(
     command_prefix='!',
@@ -26,15 +29,66 @@ with open('token.txt', 'r') as t:
     discordtoken = t.read()
 
 
+def update_colors():
+    conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
+    c = conn.cursor()
+
+    filepath = "spectrum.png"
+    img = Image.open(filepath)
+    rgb_im = img.convert('RGB')
+
+    width = img.width
+
+    # return names and elo of players
+    c.execute("SELECT ID, Elo FROM EliminationStats ORDER BY Elo DESC")
+    name_elo = c.fetchall()
+    name_elo_list = list(name_elo)
+
+    # return list of just elo
+    c.execute("SELECT Elo FROM EliminationStats ORDER BY Elo DESC")
+    elo = c.fetchall()
+    elo_list = [i[0] for i in elo]
+
+    # iterates through list of names and elos
+    # inserts percentile of elo per player
+    # calculates percentage of spectrum image to pull color from and inserts rgb value
+
+    for x in range(len(name_elo)):
+        percentile = sps.percentileofscore(elo_list, name_elo[x][1])
+        name_elo_list[x] += (percentile,)
+        name_elo_list[x] += (percentile * (width / 100) - 1,)
+        r, g, b = rgb_im.getpixel((name_elo_list[x][3], 1))
+        name_elo_list[x] += ((r, g, b),)
+
+    name_color = [[] for i in range(len(name_elo_list))]
+
+    # Appends just name and R G B values to a new list
+
+    for x in range(len(name_elo_list)):
+        name_color[x].append(name_elo_list[x][0])
+        name_color[x].append(name_elo_list[x][4][0])
+        name_color[x].append(name_elo_list[x][4][1])
+        name_color[x].append(name_elo_list[x][4][2])
+
+    # Updates R G B values in EliminationColor table.
+
+    c.executemany("insert or replace into EliminationColors(ID, R, G, B)"
+                  "values(?,?,?,?);", name_color)
+
+    conn.commit()
+    conn.close()
+
+    print('Color table updated with ', c.rowcount, 'records.')
+
+
 # List players in more attractive format
 
 def parse_players(list_to_parse):
-
     parsed_players = ""
 
     for i in range(len(list_to_parse)):
 
-        if i < (len(list_to_parse)-1):
+        if i < (len(list_to_parse) - 1):
             parsed_players += list_to_parse[i][0] + " :small_orange_diamond: "
         else:
             parsed_players += list_to_parse[i][0]
@@ -120,6 +174,7 @@ async def background_code():
                 channel = bot.get_channel(1088637359299510353)
 
                 if game_mode == "CTF" or game_mode == "Elimination":
+                    update_colors()
                     await channel.send(embed=embed)
 
         await asyncio.sleep(60)
@@ -189,6 +244,7 @@ async def background_code():
             channel = bot.get_channel(1088637359299510353)
 
             if game_mode == "CTF" or game_mode == "Elimination":
+                update_colors()
                 await channel.send(embed=embed)
 
         await asyncio.sleep(60)
