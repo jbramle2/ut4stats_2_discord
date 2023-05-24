@@ -1,3 +1,4 @@
+import datetime
 import disnake
 from disnake.ext import commands
 import psycopg2
@@ -6,12 +7,17 @@ import pytz
 from PIL import Image
 import sqlite3
 import scipy.stats as sps
+import requests
+import json
 
 bot = commands.Bot(
     command_prefix='!',
     test_guilds=[482012169911664640, 192460940409700352],
     sync_commands_debug=True
 )
+
+with open('auth_code.txt', 'r') as p:
+    auth_code = p.read()
 
 with open('stats_pass.txt', 'r') as t:
     stats_pass = t.read()
@@ -96,13 +102,19 @@ def parse_players(list_to_parse):
     return parsed_players
 
 
-@bot.slash_command(description="Show last game from server")
-async def update(inter, gametype: str = ''):
-    await inter.send('Live updates enabled')
-    asyncio.create_task(background_code())
+async def auto_run():
+    channel = bot.get_channel(1090798865965404211)
+    await channel.send('Live updates enabled')
+    asyncio.create_task(background_report_color())
+    asyncio.create_task(background_makethread())
 
 
-async def background_code():
+@bot.event
+async def on_ready():
+    await auto_run()
+
+
+async def background_report_color():
     match_id_2 = None
 
     while True:
@@ -241,7 +253,7 @@ async def background_code():
             embed.add_field(name="Blue Team Score: " + str(blue_team_score) + "", value=str(blue_team_players),
                             inline=False)
 
-            channel = bot.get_channel(1088637359299510353)
+            channel = bot.get_channel(1090798865965404211)
 
             if game_mode == "CTF" or game_mode == "Elimination":
                 update_colors()
@@ -249,5 +261,135 @@ async def background_code():
 
         await asyncio.sleep(60)
 
+
+async def makethreads():
+    criteria = {
+        "criteria":
+            [
+                {
+                    "type": "GREATER_THAN",
+                    "key": "UT_PLAYERONLINE_i",
+                    "value": 0
+                },
+                {
+                    "type": "EQUAL",
+                    "key": "UT_HUBGUID_s",
+                    "value": "0165F43010091209002C00834925F66B"
+                }
+            ],
+        "buildUniqueId": "256652735",
+        "maxResults": 10000
+    }
+
+    r = requests.post('https://master-ut4.timiimit.com/ut/api/matchmaking/session/matchMakingRequest',
+                      json=criteria)
+
+    r_json = r.json()
+    r_json = json.dumps(r_json, indent=4)
+
+    input_dict = json.loads(r_json)
+    output_dict = [x for x in input_dict if x["serverAddress"] == "104.153.105.63"]
+
+    num_instances = len(output_dict)
+
+    thread_list = []
+
+    for x in range(len(output_dict)):
+        instance_name = "Instance " + str(x)
+
+        red_team_size = output_dict[x]["attributes"]["UT_REDTEAMSIZE_i"]
+
+        blue_team_size = output_dict[x]["attributes"]["UT_BLUETEAMSIZE_i"]
+
+        numplayers = output_dict[x]["attributes"]["UT_BLUETEAMSIZE_i"] + output_dict[x]["attributes"][
+            "UT_REDTEAMSIZE_i"]
+
+        max_players = output_dict[x]["attributes"]["UT_MAXPLAYERS_i"]
+
+        players = output_dict[x]["publicPlayers"]
+        playerlist = []
+
+        map = output_dict[x]["attributes"]["MAPNAME_s"]
+
+        for i in range(len(players)):
+
+            url = "https://ut4stats.com/get_player/" + str(players[i])
+
+            headers = {
+                'content-type': "application/json",
+                'authorization': auth_code,
+                'cache-control': "no-cache",
+                'postman-token': "c33208c6-31a4-d491-f575-aded7f5986be"
+            }
+
+            response = requests.post(url, headers=headers)
+
+            if response:
+                data = response.json()
+                playerlist.append(data["playername"])
+            else:
+                playerlist.append("New Player")
+                print("NO DATA")
+
+        if len(players) > 0:
+            formatted = ':small_orange_diamond:'.join(str(e) for e in playerlist)
+        else:
+            formatted = "New Instance"
+
+        channelid = bot.get_channel(1090793930074902579)
+
+        if numplayers > 0:
+
+            thread = await channelid.create_thread(
+                name=str(map + " [" + str(numplayers) + "/" + str(max_players) + "]"),
+                auto_archive_duration=60,
+                content=str(formatted),
+            )
+
+            thread_list.append(thread)
+
+        else:
+
+            thread_list = []
+
+    if len(thread_list) > 0:
+        return thread_list
+    else:
+        return []
+
+######################################################################################################
+async def delthreads():
+
+    forum_channel = bot.get_channel(1090793930074902579)
+    active_threads = forum_channel.threads
+
+    print(active_threads[0].owner_id)
+
+    for x in range(len(active_threads)):
+        if active_threads[x].owner_id == 1088259309755957279:
+            await active_threads[x].delete()
+            print("Deleting thread:" + str(active_threads[x]))
+        else:
+            print("NOT BOT")
+
+#######################################################################################################
+
+
+async def background_makethread():
+
+    while True:
+
+        await makethreads()
+
+        await asyncio.sleep(30)
+
+        await delthreads()
+
+        now = datetime.datetime.now()
+
+        current_time = now.strftime("%H:%M:%S")
+        print("Current Time =", current_time)
+
+#######################################################################################################
 
 bot.run(str(discordtoken))
