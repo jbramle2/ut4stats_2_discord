@@ -9,6 +9,7 @@ import sqlite3
 import scipy.stats as sps
 import requests
 import json
+from table2ascii import table2ascii, Alignment
 
 bot = commands.Bot(
     command_prefix='!',
@@ -34,6 +35,54 @@ c2 = conn_game.cursor()
 with open('token.txt', 'r') as t:
     discordtoken = t.read()
 
+############################################################################################################
+
+@bot.slash_command(description="Update Elo test")
+async def updateelo(inter):
+    post_elo()
+    channel = bot.get_channel(1122733710022811730)
+    await channel.send(embed=post_elo())
+
+
+def post_elo():
+    conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
+    c = conn.cursor()
+    c.execute("SELECT ID, Elo FROM EliminationStats ORDER BY Elo DESC")
+    name_elo = c.fetchall()
+    name_list = []
+    elo_list = []
+
+    for x in range(len(name_elo)):
+        c2.execute("SELECT playername FROM utstats_player WHERE playerid = '"+str(name_elo[x][0])+"'")
+        player_name = c2.fetchone()
+        name_list.append(player_name[0])
+        elo_list.append(name_elo[x][1])
+
+    elo_name = list(zip(name_list, elo_list))
+
+    name_list = '\n'.join(name_list)
+    elo_list = [round(x) for x in elo_list]
+
+    elo_list_str = map(str, elo_list)
+    elo_list_str = list(elo_list_str)
+    elo_list_str = '\n'.join(elo_list_str)
+
+    rank = list(range(1, len(name_elo)+1))
+    rank = map(str, rank)
+    rank = list(rank)
+    rank = '\n'.join(rank)
+
+    embed = disnake.Embed(
+        title="Elim Rankings",
+        color=disnake.Color.green()
+    )
+    embed.add_field(name="Rank", value=rank, inline="true")
+    embed.add_field(name="Player", value=name_list, inline="true")
+    embed.add_field(name="Rating", value=elo_list_str, inline="true")
+
+    return embed
+
+############################################################################################################
 
 def update_colors():
     conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
@@ -109,9 +158,11 @@ async def auto_run():
     asyncio.create_task(background_makethread())
 
 
-@bot.event
-async def on_ready():
-    await auto_run()
+### Disabled for testing
+
+#@bot.event
+#async def on_ready():
+#    await auto_run()
 
 
 async def background_report_color():
@@ -183,7 +234,7 @@ async def background_report_color():
                 embed.add_field(name="Blue Team Score: " + str(blue_team_score) + "", value=str(blue_team_players),
                                 inline=False)
 
-                channel = bot.get_channel(1088637359299510353)
+                channel = bot.get_channel(1090798865965404211)
 
                 if game_mode == "CTF" or game_mode == "Elimination":
                     update_colors()
@@ -226,6 +277,8 @@ async def background_report_color():
                 game_mode = "Elimination"
             elif game_mode == "UTFlagRunGame":
                 game_mode = "Blitz"
+            else:
+                print("non supported mode")
 
             c2.execute("SELECT p.playername "
                        "FROM utstats_matchstats m, utstats_player p "
@@ -392,4 +445,7 @@ async def background_makethread():
 
 #######################################################################################################
 
+
+
+#######################################################################################################
 bot.run(str(discordtoken))

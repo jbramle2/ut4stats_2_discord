@@ -4,3 +4,4 @@ pytz~=2022.7.1
 scipy~=1.10.1
 Pillow~=9.4.0
 requests~=2.31.0
+table2ascii~=1.1.1
