@@ -9,7 +9,7 @@ import sqlite3
 import scipy.stats as sps
 import requests
 import json
-from table2ascii import table2ascii, Alignment
+from table2ascii import table2ascii, Alignment, PresetStyle
 
 bot = commands.Bot(
     command_prefix='!',
@@ -39,7 +39,6 @@ with open('token.txt', 'r') as t:
 
 @bot.slash_command(description="Update Elo test")
 async def updateelo(inter):
-    post_elo()
     channel = bot.get_channel(1122733710022811730)
     await channel.send(embed=post_elo())
 
@@ -84,6 +83,55 @@ def post_elo():
 
 ############################################################################################################
 
+@bot.slash_command(description="Update Elo test")
+async def updateelo2(inter):
+    channel = bot.get_channel(1122733710022811730)
+    await channel.send("```" + str(elo_test2()) + "```")
+
+
+def elo_test2():
+
+    conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
+    c = conn.cursor()
+    c.execute("SELECT ID, Elo FROM EliminationStats ORDER BY Elo DESC")
+    name_elo = c.fetchall()
+    name_list = []
+    elo_list = []
+
+    for x in range(len(name_elo)):
+        c2.execute("SELECT playername FROM utstats_player WHERE playerid = '"+str(name_elo[x][0])+"'")
+        player_name = c2.fetchone()
+        name_list.append(player_name[0])
+        elo_list.append(name_elo[x][1])
+
+    rank = list(range(1, len(name_elo) + 1))
+    rank = map(str, rank)
+    rank = list(rank)
+
+    elo_list = [round(x) for x in elo_list]
+    elo_list_str = map(str, elo_list)
+    elo_list_str = list(elo_list_str)
+
+    elo_name = list((zip(rank, name_list, elo_list_str)))
+
+    print(elo_name)
+
+    test_list = [list(t) for t in elo_name]
+    print(test_list)
+
+    output = table2ascii(
+        header=["Rank", "Player", "Rating"],
+        body=test_list,
+        column_widths=[6, 18, 13],
+        style=PresetStyle.plain,
+        alignments=[Alignment.LEFT, Alignment.LEFT, Alignment.DECIMAL],
+    )
+
+    print(output)
+    return output
+
+
+############################################################################################################
 def update_colors():
     conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
     c = conn.cursor()
