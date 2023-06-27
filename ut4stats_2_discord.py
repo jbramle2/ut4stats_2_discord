@@ -37,72 +37,28 @@ with open('token.txt', 'r') as t:
 
 ############################################################################################################
 
-@bot.slash_command(description="Update Elo test")
-async def updateelo(inter):
-    channel = bot.get_channel(1122733710022811730)
-    await channel.send(embed=post_elo())
 
+async def post_elo_update():
+    channel = bot.get_channel(1122992103169986590)
 
-def post_elo():
-    conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
+    await channel.purge(limit=2)
+    await channel.send("```" + str(elo_test2(1)) + "```")
+    await channel.send("```" + str(elo_test2(2)) + "```")
+
+def elo_test2(list_num):
+    conn = sqlite3.connect("C:/Users/poiso/Desktop/Mods.db")
     c = conn.cursor()
-    c.execute("SELECT ID, Elo FROM EliminationStats ORDER BY Elo DESC")
+    c.execute("SELECT ID, Elo FROM EliminationStats ORDER BY Elo DESC LIMIT 50")
     name_elo = c.fetchall()
     name_list = []
     elo_list = []
 
     for x in range(len(name_elo)):
-        c2.execute("SELECT playername FROM utstats_player WHERE playerid = '"+str(name_elo[x][0])+"'")
+        c2.execute("SELECT playername FROM utstats_player WHERE playerid = '" + str(name_elo[x][0]) + "'")
         player_name = c2.fetchone()
-        name_list.append(player_name[0])
-        elo_list.append(name_elo[x][1])
-
-    elo_name = list(zip(name_list, elo_list))
-
-    name_list = '\n'.join(name_list)
-    elo_list = [round(x) for x in elo_list]
-
-    elo_list_str = map(str, elo_list)
-    elo_list_str = list(elo_list_str)
-    elo_list_str = '\n'.join(elo_list_str)
-
-    rank = list(range(1, len(name_elo)+1))
-    rank = map(str, rank)
-    rank = list(rank)
-    rank = '\n'.join(rank)
-
-    embed = disnake.Embed(
-        title="Elim Rankings",
-        color=disnake.Color.green()
-    )
-    embed.add_field(name="Rank", value=rank, inline="true")
-    embed.add_field(name="Player", value=name_list, inline="true")
-    embed.add_field(name="Rating", value=elo_list_str, inline="true")
-
-    return embed
-
-############################################################################################################
-
-@bot.slash_command(description="Update Elo test")
-async def updateelo2(inter):
-    channel = bot.get_channel(1122733710022811730)
-    await channel.send("```" + str(elo_test2()) + "```")
-
-
-def elo_test2():
-
-    conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
-    c = conn.cursor()
-    c.execute("SELECT ID, Elo FROM EliminationStats ORDER BY Elo DESC")
-    name_elo = c.fetchall()
-    name_list = []
-    elo_list = []
-
-    for x in range(len(name_elo)):
-        c2.execute("SELECT playername FROM utstats_player WHERE playerid = '"+str(name_elo[x][0])+"'")
-        player_name = c2.fetchone()
-        name_list.append(player_name[0])
-        elo_list.append(name_elo[x][1])
+        if player_name is not None:
+            name_list.append(player_name[0])
+            elo_list.append(name_elo[x][1])
 
     rank = list(range(1, len(name_elo) + 1))
     rank = map(str, rank)
@@ -114,24 +70,35 @@ def elo_test2():
 
     elo_name = list((zip(rank, name_list, elo_list_str)))
 
-    print(elo_name)
+    list_1 = elo_name[:len(elo_name) // 2]
+    list_2 = elo_name[len(elo_name) // 2:]
 
-    test_list = [list(t) for t in elo_name]
-    print(test_list)
 
-    output = table2ascii(
-        header=["Rank", "Player", "Rating"],
-        body=test_list,
-        column_widths=[6, 18, 13],
-        style=PresetStyle.plain,
-        alignments=[Alignment.LEFT, Alignment.LEFT, Alignment.DECIMAL],
-    )
+    print(list_1)
+    print(list_2)
 
+    if list_num == 1:
+        output = table2ascii(
+            header=["Rank", "Player", "Rating"],
+            body=list_1,
+            column_widths=[6, 18, 13],
+            style=PresetStyle.plain,
+            alignments=[Alignment.LEFT, Alignment.LEFT, Alignment.DECIMAL],
+        )
+    if list_num == 2:
+        output = table2ascii(
+            header=["Rank", "Player", "Rating"],
+            body=list_2,
+            column_widths=[6, 18, 13],
+            style=PresetStyle.plain,
+            alignments=[Alignment.LEFT, Alignment.LEFT, Alignment.DECIMAL],
+        )
     print(output)
     return output
 
 
 ############################################################################################################
+
 def update_colors():
     conn = sqlite3.connect("C:/Users/poiso/PycharmProjects/elo2color/Mods.db")
     c = conn.cursor()
@@ -206,11 +173,11 @@ async def auto_run():
     asyncio.create_task(background_makethread())
 
 
-### Disabled for testing
 
-#@bot.event
-#async def on_ready():
-#    await auto_run()
+
+@bot.event
+async def on_ready():
+    await auto_run()
 
 
 async def background_report_color():
@@ -287,6 +254,7 @@ async def background_report_color():
                 if game_mode == "CTF" or game_mode == "Elimination":
                     update_colors()
                     await channel.send(embed=embed)
+                    await post_elo_update()
 
         await asyncio.sleep(60)
 
@@ -359,6 +327,7 @@ async def background_report_color():
             if game_mode == "CTF" or game_mode == "Elimination":
                 update_colors()
                 await channel.send(embed=embed)
+                await post_elo_update()
 
         await asyncio.sleep(60)
 
@@ -458,9 +427,9 @@ async def makethreads():
     else:
         return []
 
+
 ######################################################################################################
 async def delthreads():
-
     forum_channel = bot.get_channel(1090793930074902579)
     active_threads = forum_channel.threads
 
@@ -473,13 +442,12 @@ async def delthreads():
         else:
             print("NOT BOT")
 
+
 #######################################################################################################
 
 
 async def background_makethread():
-
     while True:
-
         await makethreads()
 
         await asyncio.sleep(30)
@@ -491,8 +459,8 @@ async def background_makethread():
         current_time = now.strftime("%H:%M:%S")
         print("Current Time =", current_time)
 
-#######################################################################################################
 
+#######################################################################################################
 
 
 #######################################################################################################
